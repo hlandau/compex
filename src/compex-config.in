@@ -1,0 +1,39 @@
+#!/bin/sh
+
+# compex-config
+# -------------
+# Script to output command line arguments to be passed to g++. This forms a
+# layer of abstraction hiding details such as where compex_gcc.so is located
+# and the obtuse argument passing syntax.
+
+usage() {
+  echo Usage: $SELF [options] >&2
+  echo >&2
+  echo Options: >&2
+  echo "    --gcc            Output command line arguments for g++" >&2
+  echo "    -o <filename>    Output filename for generated info" >&2
+  exit 1
+}
+
+SELF="$0"
+MODE=
+PLUGIN_DIR="@LIBPATH@"
+PLUGIN_PATH="$PLUGIN_DIR/compex_gcc.so"
+OUTPUT_ARG=
+
+while (( "$#" )); do
+  case "$1" in
+    '--gcc')    MODE=gcc ;;
+    '-o')       [ -z "$2" ] && usage; OUTPUT_ARG="-fplugin-arg-compex_gcc-o=$2"; shift ;;
+    *) usage ;;
+  esac
+  shift
+done
+
+[ -z "$MODE" ] && usage
+
+if [ "$MODE" == "gcc" ]; then
+  echo -fplugin="$PLUGIN_PATH" -D__COMPEX__=1 $OUTPUT_ARG
+fi
+
+# © 2014 Hugo Landau <hlandau@devever.net>         Licence: LGPLv3 or later

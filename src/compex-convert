@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+
+# compex-convert
+# --------------
+# Utility for converting YAML output from compex into JSON.
+
+import sys, argparse, json, re
+import yaml
+
+r_lisp_symbol = re.compile(r'''^[a-zA-Z0-9_$/-]+$''')
+
+class CompexObject(yaml.YAMLObject):
+  def lisp(self,ind=0):
+    return lisp_dump(self.__dict__,ind=ind,pre=LispSymbol(self._type))
+
+class CompexStruct(CompexObject):
+  yaml_tag = '!compex/struct'
+  _type = 'compex/struct'
+
+class CompexField(CompexObject):
+  yaml_tag = '!compex/field'
+  _type = 'compex/field'
+
+class CompexMethod(CompexObject):
+  yaml_tag = '!compex/method'
+  _type = 'compex/method'
+
+class CompexBase(CompexObject):
+  yaml_tag = '!compex/base'
+  _type = 'compex/base'
+
+class LispSymbol(object):
+  __slots__ = ['v']
+  def __init__(self,v):
+    self.v = v
+  def __str__(self):
+    return self.v
+
+def lisp_mksymbol(s):
+  if type(s) == str and r_lisp_symbol.match(s):
+    return LispSymbol(s)
+  else:
+    return s
+
+def lisp_ind(ind=0):
+  return '  '*ind
+
+def lisp_indlines(s, ind=0):
+  return '\n'.join([lisp_ind(1) + x for x in s.split('\n')])
+
+def lisp_fmtlist(L,ind=0):
+  sp = ' '
+  if len(L) > 2:
+    sp = '\n'
+  if len(L) == 2:
+    if L[1] is True:
+      return lisp_fmtlist(L[0:1], ind)
+    elif L[1] is False:
+      return ''
+  return lisp_indlines('(' + sp.join([lisp_dump(x,ind+1) for x in L]).rstrip(' \n') + ')',ind)
+
+def lisp_esc_ch(c):
+  if c == '"':
+    return '\\"'
+  elif c == '\\':
+    return '\\\\'
+  else:
+    return c
+
+def lisp_fmtstr(s,ind=0):
+  return '"' + ''.join([lisp_esc_ch(x) for x in s]) + '"'
+
+def lisp_dump(s,ind=0,pre=None):
+  if isinstance(s, yaml.YAMLObject):
+    return s.lisp(ind+1)
+  elif type(s) == list or type(s) == tuple:
+    return lisp_fmtlist(s,ind+1)
+  elif type(s) == dict:
+    p = []
+    if pre:
+      p = [pre]
+    return lisp_dump(p+[(LispSymbol(k),v) for k,v in s.items()],ind+1)
+  elif type(s) == LispSymbol:
+    return str(s)
+  elif type(s) == int:
+    return str(s)
+  elif s == True:
+    return '#t'
+  elif s == False:
+    return 'nil'
+  else:
+    return lisp_fmtstr(str(s),ind+1)
+
+def json_default(obj):
+  if isinstance(obj, yaml.YAMLObject):
+    d = dict(obj.__dict__)
+    d['_type'] = obj._type
+    return d
+  raise TypeError(obj)
+
+def run():
+  ap = argparse.ArgumentParser()
+  ap.add_argument('input-file', type=argparse.FileType('r'))
+  ap.add_argument('-j', '--json', action='store_true', default=False,
+      dest='json', help='output JSON')
+  ap.add_argument('-y', '--yaml', action='store_true', default=False,
+      dest='yaml', help='output YAML (identity operation)')
+  ap.add_argument('-l', '--lisp', action='store_true', default=False,
+      dest='lisp', help='output Lisp-ish S-expressions')
+
+  args = vars(ap.parse_args())
+  fi = args['input-file']
+
+  nopts = args['json'] + args['yaml'] + args['lisp']
+  if nopts < 1:
+    sys.stderr.write('No options specified.')
+    return 1
+  elif nopts > 1:
+    sys.stderr.write('Specify only one output option.')
+    return 1
+
+  d = yaml.load(fi.read())
+
+  if args['json']:
+    print(json.dumps(d, default=json_default, indent=2))
+  if args['yaml']:
+    print(yaml.dump(d, default_flow_style=False))
+  if args['lisp']:
+    print(lisp_dump(d, pre=LispSymbol('list')))
+
+  return 0
+
+if __name__ == '__main__':
+  sys.exit(run())
+
+# © 2014 Hugo Landau <hlandau@devever.net>         Licence: LGPLv3 or later

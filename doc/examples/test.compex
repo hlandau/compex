@@ -1,0 +1,126 @@
+SomeClass: !compex/struct
+  $srcFile: ./doc/examples/test.cpp
+  $srcLine: 5
+  x: !compex/field
+    name: x
+    size: 32
+    align: 32
+    offset: 0
+    boffset: 0
+    oalign: 128
+  y: !compex/field
+    name: y
+    size: 32
+    align: 32
+    offset: 0
+    boffset: 32
+    oalign: 128
+SomeOtherClass: !compex/struct
+  $srcFile: ./doc/examples/test.cpp
+  $srcLine: 9
+  tags:
+    -
+      - c
+    -
+      - a
+      - b
+  z: !compex/field
+    name: z
+    size: 32
+    align: 32
+    offset: 0
+    boffset: 0
+    oalign: 128
+  w: !compex/field
+    name: w
+    size: 32
+    align: 32
+    offset: 0
+    boffset: 32
+    oalign: 128
+SubClass: !compex/struct
+  $srcFile: ./doc/examples/test.cpp
+  $srcLine: 13
+  base_0$: !compex/base
+    access: public
+    name: SomeClass
+  _vptr.SubClass: !compex/field
+    name: _vptr.SubClass
+    size: 64
+    align: 64
+    offset: 0
+    boffset: 0
+    oalign: 128
+    artificial: true
+  anon_1$: !compex/field
+    size: 64
+    align: 32
+    offset: 0
+    boffset: 64
+    oalign: 128
+    artificial: true
+    unknown: true
+  a: !compex/field
+    name: a
+    size: 32
+    align: 32
+    offset: 16
+    boffset: 0
+    oalign: 128
+    tags:
+      -
+        - property
+  b: !compex/field
+    name: b
+    size: 32
+    align: 32
+    offset: 16
+    boffset: 32
+    oalign: 128
+    tags:
+      -
+        - blah
+        - 42
+  method_1$: !compex/method
+    name: SubClass
+    asm: _ZN8SubClassC4Ev
+    artificial: true
+    constructor: true
+    nothrow: true
+  method_2$: !compex/method
+    name: __base_ctor 
+    asm: _ZN8SubClassC2Ev
+    artificial: true
+    constructor: true
+    base_constructor: true
+    nothrow: true
+  method_3$: !compex/method
+    name: __comp_ctor 
+    asm: _ZN8SubClassC1Ev
+    artificial: true
+    constructor: true
+    complete_constructor: true
+    nothrow: true
+  method_4$: !compex/method
+    name: DoSomething
+    asm: _ZN8SubClass11DoSomethingEii
+    virtual: true
+  method_5$: !compex/method
+    name: DoSomething
+    asm: _ZNK8SubClass11DoSomethingEii
+    virtual: true
+    const: true
+    tags:
+      -
+        - special_method
+  method_6$: !compex/method
+    name: stuff
+    asm: _ZN8SubClass5stuffEv
+    static: true
+  method_7$: !compex/method
+    name: f1
+    asm: _ZN8SubClass2f1Ev
+  method_8$: !compex/method
+    name: f2
+    asm: _ZN8SubClass2f2Ev
+    nothrow: true
