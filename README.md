@@ -119,6 +119,7 @@ output into JSON, if desired.
 Colophon
 --------
 © 2014 Hugo Landau <hlandau@devever.net>
+
 Licenced under the LGPLv3 or later. See `doc/COPYING`.
 
 Send bug reports or patches to <hlandau@devever.net>.
