@@ -38,62 +38,18 @@
 #include "plugin-version.h"
 #include "intl.h"
 #include <stdio.h>
+#include <stdint.h>
 
 #define VERSION "compex_gcc v1"
-
-static FILE *_output_f = stdout;
-
 #define LOGF(...) fprintf(stderr,    "# COMPEX_GCC: " __VA_ARGS__)
 #define OUTF(...) fprintf(_output_f, "" __VA_ARGS__)
+
+static uint32_t _counter = 0;
+static FILE *_output_f = stdout;
 
 static void _indent(int n) {
   for (int i=0;i<n;++i)
     fprintf(_output_f, "  ");
-}
-
-static tree _handle_tag_attr(tree *node, tree attr_name, tree attr_arguments,
-                              int flags, bool *no_add_attrs) {
-#if 0
-  tree type;
-  type = *node;
-  type = TYPE_MAIN_VARIANT(type);
-
-  if (TREE_CODE(type) != RECORD_TYPE) {
-    error(G_("COMPEX: attribute %qE can only be placed on struct/class definitions"), attr_name);
-    return NULL_TREE;
-  }
-#endif
-
-#if 0
-  if (CLASSTYPE_DECLARED_CLASS(type))
-    warning(0, G_("COMPEX: use of 'struct' is preferred instead of class"));
-#endif
-
-  // RECORD_TYPE:
-  //   TYPE_FIELDS(t) -> contains items in type
-  //                     each is either FIELD_DECL, VAR_DECL, CONST_DECL or
-  //                     TYPE_DECL
-  //
-  //LOGF("Attribute: %s\n", IDENTIFIER_POINTER(attr_name));
-  //LOGF("On: %d %s\n", TREE_CODE(*node), get_tree_code_name(TREE_CODE(*node)));
-
-  //for (tree &arg = attr_arguments; arg != NULL_TREE; arg = TREE_CHAIN(arg)) {
-  //  LOGF("  %s\n", TREE_STRING_POINTER(TREE_VALUE(arg)));
-  //}
-
-  // TREE_CODE(t)    -> node type code
-  // TREE_CHAIN(t)   -> tree;
-  // TREE_TYPE(t)    -> tree; type of node
-  // TREE_PURPOSE(t) ->
-  // TREE_VALUE(t)   ->
-  //
-  // NULL_TREE
-  // TREE_VEC
-  // TREE_LIST
-
-  *no_add_attrs = false;
-
-  return NULL_TREE;
 }
 
 static const char *_access_to_str(void *access) {
@@ -103,7 +59,16 @@ static const char *_access_to_str(void *access) {
   else                                        return NULL;
 }
 
-static unsigned _counter = 0;
+/* _handle_tag_attr
+ * ----------------
+ * Called by gcc upon encountering [[compex::tag()]] attribute.
+ */
+static tree
+_handle_tag_attr(tree *node, tree attr_name, tree attr_arguments,
+                              int flags, bool *no_add_attrs) {
+  *no_add_attrs = false;
+  return NULL_TREE;
+}
 
 /* _dump_tags
  * ----------
@@ -294,6 +259,9 @@ _finish_type(void *event_data, void *data) {
   }
 }
 
+/* Attribute Registration
+ * ----------------------
+ */
 static const attribute_spec _attributes[] = {
   { "tag", 0, -1, false, true, false, _handle_tag_attr, false },
   NULL
@@ -304,23 +272,15 @@ _register_attributes(void *event_data, void *user_data) {
   register_scoped_attributes(_attributes, "compex");
 }
 
-/*
-static void _gate_callback(void *event_data, void *user_data) {
-  if (errorcount || sorrycount)
-    return;
-  //LOGF("IPA passes starting for file: %s\n", main_input_filename);
-  // ...
-}*/
-
+/* plugin_init
+ * -----------
+ * Main plugin entrypoint called by gcc.
+ */
 static const struct plugin_info _plugin_info = {
   VERSION,
   VERSION ": Output C++ type information.",
 };
 
-/* plugin_init
- * -----------
- * Main plugin entrypoint called by gcc.
- */
 int
 plugin_init(plugin_name_args *info, plugin_gcc_version *ver) {
   const char *k, *v;
@@ -352,7 +312,6 @@ plugin_init(plugin_name_args *info, plugin_gcc_version *ver) {
   register_callback(info->base_name, PLUGIN_INFO, NULL, (void*)&_plugin_info);
   register_callback(info->base_name, PLUGIN_ATTRIBUTES, &_register_attributes, NULL);
   register_callback(info->base_name, PLUGIN_FINISH_TYPE, &_finish_type, NULL);
-  //register_callback(info->base_name, PLUGIN_ALL_IPA_PASSES_START, &_gate_callback, NULL);
 
   return 0;
 }
