@@ -39,6 +39,7 @@
 #include "intl.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <unordered_set>
 
 #define VERSION "compex_gcc v1"
 #define LOGF(...) fprintf(stderr,    "# COMPEX_GCC: " __VA_ARGS__)
@@ -116,6 +117,43 @@ _dump_tags(tree arg, int ind) {
   }
 }
 
+/* _mangle_typename
+ * ----------------
+ * Warning: uses static storage for returned string.
+ */
+const char *_mangle_typename(tree type) {
+#define MANGLE_STR_LEN 1024
+  static char name[MANGLE_STR_LEN] = {};
+  static unsigned unk_i = 0;
+
+  switch (TREE_CODE(type)) {
+    case RECORD_TYPE:
+      name[0] = 's';
+      name[1] = '_';
+      strncpy(name+2, IDENTIFIER_POINTER(DECL_NAME(TYPE_NAME(type))), MANGLE_STR_LEN-2);
+      break;
+    default:
+      sprintf(name, "unknown_%u", ++unk_i);
+      break;
+  }
+  return name;
+}
+
+static std::unordered_set<std::string> _mangled_names;
+const char *_mangle_typename_def(tree type) {
+  const char *v = _mangle_typename(type);
+  _mangled_names.insert(v);
+  return v;
+}
+
+const char *_mangle_typename_ref(tree type) {
+  const char *v = _mangle_typename(type);
+  if (_mangled_names.count(v))
+    return v;
+  else
+    return NULL;
+}
+
 /* _finish_type
  * ------------
  * Output type information on nodes which have at least one compex::tag
@@ -131,7 +169,7 @@ _finish_type(void *event_data, void *data) {
   type = TYPE_MAIN_VARIANT(type);
 
   // TODO: find way to lookup in de:: namespace
-  if (!lookup_attribute("tag", TYPE_ATTRIBUTES(type)))
+  if (!lookup_attribute("compex_tag", TYPE_ATTRIBUTES(type)))
     return;
 
   if (!COMPLETE_TYPE_P(type)) {
@@ -148,9 +186,13 @@ _finish_type(void *event_data, void *data) {
   unsigned offset_v, boffset_v, oalign_v;
   char fnamebuf[64];
 
-  OUTF("%s: !compex/struct\n", struct_name);
+  OUTF("%s: &%s !compex/struct\n", struct_name, _mangle_typename_def(type));
   OUTF("  $srcFile: %s\n", DECL_SOURCE_FILE(decl));
   OUTF("  $srcLine: %u\n", DECL_SOURCE_LINE(decl));
+
+  sizeof_v = (tree_fits_shwi_p(TYPE_SIZE(type)) ? tree_to_shwi(TYPE_SIZE(type)) : -1);
+  OUTF("  $sizeof: %u\n", sizeof_v);
+  OUTF("  $alignof: %u\n", TYPE_ALIGN(type));
 
   _dump_tags(type, 1);
 
@@ -171,6 +213,9 @@ _finish_type(void *event_data, void *data) {
     tree bdecl  = TYPE_NAME(btype);
     tree bid    = DECL_NAME(bdecl);
     OUTF("    name: %s\n", IDENTIFIER_POINTER(bid));
+    const char *mref = _mangle_typename_ref(btype);
+    if (mref)
+      OUTF("    ref: *%s\n", mref);
   }
 
   for (tree arg = TYPE_FIELDS(type); arg != NULL_TREE; arg = TREE_CHAIN(arg)) {
@@ -263,13 +308,19 @@ _finish_type(void *event_data, void *data) {
  * ----------------------
  */
 static const attribute_spec _attributes[] = {
-  { "tag", 0, -1, false, true, false, _handle_tag_attr, false },
+  { "compex_tag", 0, -1, false, true, false, _handle_tag_attr, false },
   NULL
 };
 
 static void
 _register_attributes(void *event_data, void *user_data) {
-  register_scoped_attributes(_attributes, "compex");
+  register_attribute(&_attributes[0]);
+
+  /* register_scoped_attributes allows things like [[compex::tag]], but appears
+   * to be buggy at this time (causes segfaults, even if nothing is done in the
+   * attribute handler).
+   */
+  //register_scoped_attributes(_attributes, "compex");
 }
 
 /* plugin_init

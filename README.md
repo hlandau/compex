@@ -21,10 +21,7 @@ compex is a very small codebase which can be easily customized or adapted. It
 may also serve as interesting reading for those interested in writing GCC
 plugins.
 
-Since compex relies upon the C++11 attribute syntax, use of C++11 is required
-for source code processed by compex.
-
-compex is entirely unrelated to C++ RTTI (dynamic_cast) and does not require it
+compex is entirely unrelated to C++ RTTI (`dynamic_cast`) and does not require it
 in any way.
 
 Building
@@ -105,16 +102,21 @@ this:
         - 2
         - c
 
-You can also use the C++11 attributes directly, but this is not recommended:
+You can also use the GCC attributes directly, but this is not recommended:
 
-    struct [[compex::tag("foo")]] my_struct {
+    struct __attribute__((compex_tag("foo"))) my_struct {
       // ...
     };
+
+compex currently uses the GCC attribute syntax instead of the C++11 attribute
+syntax due to what appears to be a bug in GCC, but this is all smoothed over by
+`compex.h` anyway.
 
 Extras
 ------
 The barebones script `script/compex-convert` can be used to convert the YAML
-output into JSON, if desired.
+output into JSON, if desired, or alternately into a format intended to be
+amenable to processing with the C preprocessor.
 
 Colophon
 --------

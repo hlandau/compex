@@ -98,6 +98,136 @@ def json_default(obj):
     return d
   raise TypeError(obj)
 
+def _mapAccess(n):
+  if n == 'public':
+    return 'COMPEX_ACCESS_PUBLIC'
+  elif n == 'protected':
+    return 'COMPEX_ACCESS_PROTECTED'
+  elif n == 'private':
+    return 'COMPEX_ACCESS_PRIVATE'
+  else:
+    return n
+
+def _mapBool(b,t,f):
+  if bool(b) is True: return t
+  else: return f
+
+def _mapValue(v):
+  if type(v) == str:
+    return lisp_fmtstr(v)
+  else:
+    return str(v)
+
+def _mapTag(d):
+  return ','.join(['COMPEX_TAG_VALUE(%s)' % _mapValue(x) for x in d])
+
+def _mapTags(d):
+  tags = d.__dict__.get('tags');
+  if not tags or len(tags) == 0:
+    return 'COMPEX_NO_TAGS()'
+  s  = 'COMPEX_TAGS(%s)' % ','.join(['COMPEX_TAG(%s)' % _mapTag(x) for x in tags])
+  return s
+
+def c_dump(d):
+  s  = ''
+  s += '#include "compex-user-inc.h"\n'
+  s += '\n'
+  s += 'COMPEX_STRUCTS(\n'
+  for k,v in d.items():
+    if not isinstance(v, CompexStruct):
+      continue
+    s += '  COMPEX_STRUCT(%s,%s,%s,0,"%s",%s,\n' \
+        % (k, v.__dict__['$sizeof'], v.__dict__['$alignof'], v.__dict__['$srcFile'], v.__dict__['$srcLine'])
+    started = False
+    for bk,bv in v.__dict__.items():
+      if not isinstance(bv, CompexBase):
+        continue
+      if started is False:
+        started = True
+        s += '    COMPEX_BASES(\n'
+      s += '      COMPEX_BASE(%s,%s,%s)\n' % \
+          (bv.name,_mapAccess(bv.access), _mapBool(bv.__dict__.get('virtual'),
+            'COMPEX_BASE_IS_VIRTUAL', 'COMPEX_BASE_IS_NOT_VIRTUAL'))
+
+    if started:
+      s  = s.rstrip(',\n')
+      s += '\n    )/*BASES*/\n'
+    else:
+      s += '    COMPEX_NO_BASES()\n'
+
+    started = False
+    for fk,fv in v.__dict__.items():
+      if not isinstance(fv, CompexField):
+        continue
+      if started is False:
+        started = True
+        s += '    COMPEX_FIELDS(\n'
+      if 'name' in fv.__dict__ and fv.name.startswith('_vptr.'):
+        s += '      COMPEX_FIELD_VPTR_FOR(%s,%s,%s,%s,%s,%s),\n' % \
+            (fv.name[6:],fv.size,fv.align,fv.offset,fv.boffset,fv.oalign)
+      elif not 'name' in fv.__dict__:
+        s += '      COMPEX_FIELD_ANON(%s,%s,%s,%s,%s,%s,%s),\n' % \
+            (fv.size, fv.align, fv.offset, fv.boffset, fv.oalign,
+                _mapBool(fv.__dict__.get('artificial'),
+                  'COMPEX_FIELD_IS_ARTIFICIAL',
+                  'COMPEX_FIELD_IS_NOT_ARTIFICIAL'),
+                _mapBool(fv.__dict__.get('unknown'),
+                  'COMPEX_FIELD_IS_UNKNOWN',
+                  'COMPEX_FIELD_IS_NOT_UNKNOWN'))
+      else:
+        s += '      COMPEX_FIELD(%s,%s,%s,%s,%s,%s,%s,%s),\n' % \
+            (fv.name, fv.size, fv.align, fv.offset, fv.boffset, fv.oalign,
+             _mapBool(fv.__dict__.get('artificial'),
+             'COMPEX_FIELD_IS_ARTIFICIAL', 'COMPEX_FIELD_IS_NOT_ARTIFICIAL'),
+             _mapBool(fv.__dict__.get('unknown'),
+             'COMPEX_FIELD_IS_UNKNOWN', 'COMPEX_FIELD_IS_NOT_UNKNOWN'))
+    if started:
+      s  = s.rstrip(',\n')
+      s += '\n    )/*FIELDS*/,\n'
+    else:
+      s += '    COMPEX_NO_FIELDS()\n'
+    started = False
+    for mk,mv in v.__dict__.items():
+      if not isinstance(mv, CompexMethod):
+        continue
+      if started is False:
+        started = True
+        s += '    COMPEX_METHODS(\n'
+      s += '      COMPEX_METHOD(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s),\n' % \
+          (mv.name, mv.asm, _mapBool(mv.__dict__.get('artificial'),
+            'COMPEX_METHOD_IS_ARTIFICIAL', 'COMPEX_METHOD_IS_NOT_ARTIFICIAL'),
+            _mapBool(mv.__dict__.get('constructor'),
+              'COMPEX_METHOD_IS_CONSTRUCTOR',
+              'COMPEX_METHOD_IS_NOT_CONSTRUCTOR'),
+            _mapBool(mv.__dict__.get('complete_constructor'),
+              'COMPEX_METHOD_IS_COMPLETE_CONSTRUCTOR',
+              'COMPEX_METHOD_IS_NOT_COMPLETE_CONSTRUCTOR'),
+            _mapBool(mv.__dict__.get('nothrow'),
+              'COMPEX_METHOD_IS_NOTHROW',
+              'COMPEX_METHOD_IS_NOT_NOTHROW'),
+            _mapBool(mv.__dict__.get('static'),
+              'COMPEX_METHOD_IS_STATIC',
+              'COMPEX_METHOD_IS_NOT_STATIC'),
+            _mapBool(mv.__dict__.get('virtual'),
+              'COMPEX_METHOD_IS_VIRTUAL',
+              'COMPEX_METHOD_IS_NOT_VIRTUAL'),
+            _mapBool(mv.__dict__.get('const'),
+              'COMPEX_METHOD_IS_CONST',
+              'COMPEX_METHOD_IS_NOT_CONST'),
+            _mapBool(mv.__dict__.get('destructor'),
+              'COMPEX_METHOD_IS_DESTRUCTOR',
+              'COMPEX_METHOD_IS_NOT_DESTRUCTOR'),
+            _mapTags(mv))
+    if started:
+      s = s.rstrip(',\n')
+      s += '\n    )/*METHODS*/\n'
+    else:
+      s += '    COMPEX_NO_METHODS()\n'
+    s += '  )/*STRUCT*/,\n'
+  s = s.rstrip('\n,')
+  s += '\n)/*STRUCTS*/\n'
+  return s
+
 def run():
   ap = argparse.ArgumentParser()
   ap.add_argument('input-file', type=argparse.FileType('r'))
@@ -107,11 +237,13 @@ def run():
       dest='yaml', help='output YAML (identity operation)')
   ap.add_argument('-l', '--lisp', action='store_true', default=False,
       dest='lisp', help='output Lisp-ish S-expressions')
+  ap.add_argument('-c', '--c', action='store_true', default=False,
+      dest='c', help='output C macro-style format')
 
   args = vars(ap.parse_args())
   fi = args['input-file']
 
-  nopts = args['json'] + args['yaml'] + args['lisp']
+  nopts = args['json'] + args['yaml'] + args['lisp'] + args['c']
   if nopts < 1:
     sys.stderr.write('No options specified.')
     return 1
@@ -127,6 +259,8 @@ def run():
     print(yaml.dump(d, default_flow_style=False))
   if args['lisp']:
     print(lisp_dump(d, pre=LispSymbol('list')))
+  if args['c']:
+    print(c_dump(d))
 
   return 0
 

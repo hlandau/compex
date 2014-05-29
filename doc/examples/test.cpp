@@ -30,6 +30,17 @@ struct COMPEX_TAG() SubClass :public SomeClass {
   int f2() throw();
 };
 
+template<typename T>
+struct COMPEX_TAG() TClass {
+  int x;
+  T y;
+};
+
+struct COMPEX_TAG() SubClass2 :public SubClass {
+  int g1();
+  ~SubClass2();
+};
+
 int main(int argc, char **argv) {
   return 0;
 }

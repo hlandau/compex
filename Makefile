@@ -1,7 +1,7 @@
 HOST_GCC=g++
 TARGET_GCC=g++
 GCCPLUGINS_DIR := $(shell $(TARGET_GCC) -print-file-name=plugin)
-CXXFLAGS += -g -fno-rtti -O3
+CXXFLAGS += -g -fno-rtti -std=gnu++11 -O3
 PLUGIN_CXXFLAGS=$(CXXFLAGS) -I$(GCCPLUGINS_DIR)/include -fPIC
 PREFIX=/usr/local
 BINPATH=$(PREFIX)/bin
