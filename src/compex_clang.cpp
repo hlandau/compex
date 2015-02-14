@@ -18,7 +18,8 @@ BEGIN_NS()
  * --------
  */
 struct Consumer :public ASTConsumer {
-  Consumer(CompilerInstance &ci);
+  Consumer(CompilerInstance &ci, raw_ostream *out);
+
   virtual bool HandleTopLevelDecl(DeclGroupRef dg);
 
 protected:
@@ -44,17 +45,18 @@ protected:
 
   CompilerInstance &_ci;
   ASTContext &_ctx;
+  raw_ostream *_out;
   int _indent;
 };
 #define INDENT_SCOPE() indent _indenter(*this)
 
-Consumer::Consumer(CompilerInstance &ci)
-  :_ci(ci), _ctx(ci.getASTContext()), _indent(0) {}
+Consumer::Consumer(CompilerInstance &ci, raw_ostream *out)
+  :_ci(ci), _ctx(ci.getASTContext()), _indent(0), _out(out) {}
 
 raw_ostream &Consumer::_Indent() {
   for (int i=0; i<_indent; ++i)
-    llvm::errs() << "  ";
-  return llvm::errs();
+    *_out << "  ";
+  return *_out;
 }
 
 bool Consumer::HandleTopLevelDecl(DeclGroupRef dg) {
@@ -65,6 +67,7 @@ bool Consumer::HandleTopLevelDecl(DeclGroupRef dg) {
     _HandleNamedDecl(nd);
   }
 
+  _out->flush();
   return true;
 }
 
@@ -233,51 +236,6 @@ void Consumer::_HandleAttrs(const Decl *d) {
   }
 }
 
-/*
-  method_1$: !compex/method
-    name: SubClass
-    asm: _ZN8SubClassC4Ev
-    artificial: true
-    constructor: true
-    nothrow: true
-  method_2$: !compex/method
-    name: __base_ctor 
-    asm: _ZN8SubClassC2Ev
-    artificial: true
-    constructor: true
-    base_constructor: true
-    nothrow: true
-  method_3$: !compex/method
-    name: __comp_ctor 
-    asm: _ZN8SubClassC1Ev
-    artificial: true
-    constructor: true
-    complete_constructor: true
-    nothrow: true
-  method_4$: !compex/method
-    name: DoSomething
-    asm: _ZN8SubClass11DoSomethingEii
-    virtual: true
-  method_5$: !compex/method
-    name: DoSomething
-    asm: _ZNK8SubClass11DoSomethingEii
-    virtual: true
-    const: true
-    tags:
-      -
-        - special_method
-  method_6$: !compex/method
-    name: stuff
-    asm: _ZN8SubClass5stuffEv
-    static: true
-  method_7$: !compex/method
-    name: f1
-    asm: _ZN8SubClass2f1Ev
-  method_8$: !compex/method
-    name: f2
-    asm: _ZN8SubClass2f2Ev
-    nothrow: true
-    */
 /* Plugin
  * ------
  */
@@ -285,18 +243,42 @@ struct Plugin :public PluginASTAction {
   ASTConsumer *CreateASTConsumer(CompilerInstance &ci, llvm::StringRef x);
   bool ParseArgs(const CompilerInstance &ci, const std::vector<std::string> &args);
   void PrintHelp(llvm::raw_ostream &ros);
+
+protected:
+  std::string _outputfn;
+  llvm::raw_fd_ostream *_outfd;
+  llvm::raw_ostream *_out;
 };
 
 ASTConsumer
 *Plugin::CreateASTConsumer(CompilerInstance &ci, llvm::StringRef x) {
-  return new Consumer(ci);
+  std::string errinfo;
+  if (_outputfn.size()) {
+    _outfd = new llvm::raw_fd_ostream(_outputfn.c_str(), errinfo, llvm::sys::fs::F_None);
+    _out = _outfd;
+  } else
+    _out = &llvm::outs();
+
+  if (!_out) {
+    llvm::errs() << "Could not open compex output file: " << errinfo << "\n";
+    return NULL;
+  }
+
+  return new Consumer(ci, _out);
 }
 
 bool Plugin::ParseArgs(
     const CompilerInstance &ci,
     const std::vector<std::string> &args) {
   for (auto &arg :args) {
-    llvm::errs() << "CompexClang arg: " << arg << "\n";
+    if (arg.size() > 3 && arg.substr(0,3) == "-o=") {
+      if (_outputfn.size()) {
+        llvm::errs() << "compex_clang: Output filename must not be specified more than once\n";
+        return false;
+      }
+
+      _outputfn = arg.substr(3);
+    }
   }
 
   if (!args.empty() && args[0] == "help")
@@ -308,10 +290,12 @@ bool Plugin::ParseArgs(
 void Plugin::PrintHelp(llvm::raw_ostream &ros) {
   ros << "compex_clang\n";
   ros << "  Supported options:\n";
-  ros << "  [-Xclang] -plugin-arg-compex_clang-o=<output filename>   (default: stdout)\n";
+  ros << "  [-Xclang] -plugin-arg-compex_clang [-Xclang] -o=<output filename>   (default: stdout)\n";
   ros << "\n";
 }
 
 END_NS
 
 static FrontendPluginRegistry::Add<Plugin> _plugin("compex_clang", "Reflection plugin.");
+
+// © 2015 Hugo Landau <hlandau@devever.net>      UoI-NCSA License
