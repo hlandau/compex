@@ -1,7 +1,8 @@
 compex
 ======
 
-compex is a GCC plugin for extracting type information from C++.
+compex provides plugins for GCC and clang for extracting type information from
+C++.
 
 The plugin itself dumps information about structures, fields and methods in
 YAML format, allowing you to easily build reflection facilities with C++.
@@ -10,25 +11,31 @@ A Python 3 helper script is included to convert to JSON if preferred.
 
 You can also annotate structures, fields and methods with arbitrary tags.
 
-Because compex is a GCC plugin, type information can be dumped as you compile
-files, eliminating the need to parse your source code twice and eliminate
-compile times.
+Because compex is a compiler plugin, type information can be dumped as you
+compile files, eliminating the need to parse your source code twice and
+increase compile times.
 
-Because compex uses GCC's C++ parsing facilities, it understands all of C++,
-unlike tools such as Qt's moc, which can only parse limited subsets of C++.
+Because compex uses the C++ compiler's parsing facilities, it understands all
+of C++, unlike tools such as Qt's moc, which can only parse limited subsets of
+C++.
 
 compex is a very small codebase which can be easily customized or adapted. It
-may also serve as interesting reading for those interested in writing GCC
+may also serve as interesting reading for those interested in writing compiler
 plugins.
 
-compex is entirely unrelated to C++ RTTI (`dynamic_cast`) and does not require it
-in any way.
+compex is entirely unrelated to C++ RTTI (`dynamic_cast`) and does not require
+it in any way.
 
 Building
 --------
-Change into the `gcc` directory and run `make`. Run `make install` to install.
-The following are the default installation parameters, which you may override
-by passing them to make:
+Run `make`. If you only have one of gcc and clang installed, edit the Makefile
+and remove `compex_gcc.so` or `compex_clang.so` (as appropriate) from the `all`
+target.
+
+You may need to ensure that the header packages for GCC/clang are installed.
+
+Run `make install` to install. The following are the default installation
+parameters, which you may override by passing them to make:
 
     PREFIX=/usr/local
     BINPATH=$(PREFIX)/bin
@@ -36,23 +43,30 @@ by passing them to make:
     LIBPATH=$(PREFIX)/lib
     DESTDIR=                    # sandbox installation path
 
-You can then run `g++` using the plugin directly:
+You can then run `g++` or `clang++` using the plugin directly:
 
     g++ -c -fplugin=/usr/local/lib/compex_gcc.so file.cpp
+    clang++ -c -Xclang -load -Xclang /usr/local/lib/compex_clang.so \
+      -Xclang -plugin -Xclang compex_clang
 
 or, after installation, using `compex-config` (recommended):
 
     g++ -c `compex-config --gcc` file.cpp
+
+For clang:
+
+    clang++ -c `compex-config --clang` file.cpp
 
 compex output is sent to stdout by default. To redirect it to a file, pass `-o
 filename` to `compex-config`:
 
     g++ -c `compex-config --gcc -o file.info` file.cpp
 
-You can alternatively pass `-fplugin-arg-compex_gcc-o=filename` directly to g++.
+You can alternatively pass `-fplugin-arg-compex_gcc-o=filename` directly to g++
+or `-Xclang -plugin-arg-compex_clang -Xclang -o=filename` to clang++.
 
 If you want to run compex without producing normal object code output, pass
-`-S -o /dev/null` to g++.
+`-S -o /dev/null` to the compiler.
 
 Example Input Programs; Example Output
 --------------------------------------
