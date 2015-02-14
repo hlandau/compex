@@ -136,6 +136,10 @@ Colophon
 --------
 © 2014 Hugo Landau <hlandau@devever.net>
 
-Licenced under the LGPLv3 or later. See `doc/COPYING`.
+File licenses vary due to the different licenses used by GCC/clang. See the end
+of each file for license information.
+
+(Please note that licenses do not affect the output of compex, which can be
+used without restriction.)
 
 Send bug reports or patches to <hlandau@devever.net>.

@@ -267,4 +267,4 @@ def run():
 if __name__ == '__main__':
   sys.exit(run())
 
-# © 2014 Hugo Landau <hlandau@devever.net>         Licence: LGPLv3 or later
+# © 2014 Hugo Landau <hlandau@devever.net>         MIT License
