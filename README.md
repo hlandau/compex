@@ -105,7 +105,7 @@ arguments are specified.
 
 For example, if you specified
 `COMPEX_TAG() COMPEX_TAG("a", "b", 42) COMPEX_TAG(1, 2, "c")`,
-the 'tags' member of the ouptut for the structure would look something like
+the 'tags' member of the output for the structure would look something like
 this:
 
     tags:

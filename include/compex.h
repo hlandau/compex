@@ -31,4 +31,4 @@
 #  define COMPEX_TAG(...)
 #endif
 
-// 2014 Hugo Landau <hlandau@devever.net>          Public Domain
+// 2015 Hugo Landau <hlandau@devever.net>          Public Domain

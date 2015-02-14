@@ -13,6 +13,7 @@ usage() {
   echo "    --gcc            Output command line arguments for g++" >&2
   echo "    --clang          Output command line arguments for clang++" >&2
   echo "    -o <filename>    Output filename for generated info" >&2
+  echo "    -a               Output all types, not just tagged types" >&2
   exit 1
 }
 
@@ -23,6 +24,8 @@ GCC_PLUGIN_PATH="$PLUGIN_DIR/compex_gcc.so"
 CLANG_PLUGIN_PATH="$PLUGIN_DIR/compex_clang.so"
 GCC_OUTPUT_ARG=
 CLANG_OUTPUT_ARG=
+GCC_ALL_ARG=
+CLANG_ALL_ARG=
 
 while (( "$#" )); do
   case "$1" in
@@ -32,6 +35,10 @@ while (( "$#" )); do
       GCC_OUTPUT_ARG="-fplugin-arg-compex_gcc-o=$2"
       CLANG_OUTPUT_ARG="-Xclang -plugin-arg-compex_clang -Xclang -o=$2"
       shift ;;
+    '-a')
+      GCC_ALL_ARG="-fplugin-arg-compex_gcc-a"
+      CLANG_ALL_ARG="-Xclang -plugin-arg-compex_clang -Xclang -a"
+      ;;
     *) usage ;;
   esac
   shift
@@ -40,12 +47,12 @@ done
 [ -z "$MODE" ] && usage
 
 if [ "$MODE" == "gcc" ]; then
-  echo -fplugin="$GCC_PLUGIN_PATH" -D__COMPEX__=1 $OUTPUT_ARG
+  echo -fplugin="$GCC_PLUGIN_PATH" -D__COMPEX__=1 $GCC_OUTPUT_ARG $GCC_ALL_ARG
 fi
 
 if [ "$MODE" == "clang" ]; then
   echo -Xclang -D__COMPEX__=1 -load -Xclang $CLANG_PLUGIN_PATH -Xclang -plugin -Xclang compex_clang \
-    $CLANG_OUTPUT_ARG
+    $CLANG_OUTPUT_ARG $CLANG_ALL_ARG
 fi
 
-# © 2014 Hugo Landau <hlandau@devever.net>         Licence: LGPLv3 or later
+# © 2015 Hugo Landau <hlandau@devever.net>         MIT License

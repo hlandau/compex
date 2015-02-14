@@ -12,22 +12,20 @@
  *
  * Supported attributes:
  *
- *   [[compex::tag(...)]]   The zero or more arguments specified must each be
- *                          either string literals or integers. If a nonzero
- *                          number of arguments is specified, the arguments
- *                          form a list of literals which are attached as
- *                          metadata to the object to which the attribute
- *                          attaches.
+ *   __attribute__((compex_tag(...)))
  *
- *                          The attribute may be specified multiple times. The
- *                          arguments to each invocation are kept in separate
- *                          lists, which are then aggregated in a list of
- *                          lists. Note that this list will not contain any
- *                          empty lists.
+ *     The zero or more arguments specified must each be either string literals
+ *     or integers. If a nonzero number of arguments is specified, the
+ *     arguments form a list of literals which are attached as metadata to the
+ *     object to which the attribute attaches.
  *
- *                          When used on structures, this also indicates that
- *                          the structure's type information should be dumped.
- *                          Structures are not dumped by default.
+ *     The attribute may be specified multiple times. The arguments to each
+ *     invocation are kept in separate lists, which are then aggregated in a
+ *     list of lists. Note that this list will not contain any empty lists.
+ *
+ *     When used on structures, this also indicates that the structure's type
+ *     information should be dumped. Structures are not dumped by default.
+ *
  */
 #include "config.h"
 #include "gcc-plugin.h"
@@ -47,6 +45,7 @@
 
 static uint32_t _counter = 0;
 static FILE *_output_f = stdout;
+static bool _dumpall = false;
 
 static void _indent(int n) {
   for (int i=0;i<n;++i)
@@ -79,7 +78,7 @@ static void
 _dump_tags(tree arg, int ind) {
   bool outt = false;
 
-  for (tree tag = lookup_attribute("tag", TYPE_ATTRIBUTES(arg)); tag != NULL_TREE; tag = TREE_CHAIN(tag)) {
+  for (tree tag = lookup_attribute("compex_tag", TYPE_ATTRIBUTES(arg)); tag != NULL_TREE; tag = TREE_CHAIN(tag)) {
     tree tagargs = TREE_VALUE(tag);
     bool out = false;
     for (tree tagarg = tagargs; tagarg != NULL_TREE; tagarg = TREE_CHAIN(tagarg)) {
@@ -169,7 +168,7 @@ _finish_type(void *event_data, void *data) {
   type = TYPE_MAIN_VARIANT(type);
 
   // TODO: find way to lookup in de:: namespace
-  if (!lookup_attribute("compex_tag", TYPE_ATTRIBUTES(type)))
+  if (!_dumpall && !lookup_attribute("compex_tag", TYPE_ATTRIBUTES(type)))
     return;
 
   if (!COMPLETE_TYPE_P(type)) {
@@ -353,6 +352,8 @@ plugin_init(plugin_name_args *info, plugin_gcc_version *ver) {
           return 1;
         }
       }
+    } else if (!strcmp(k, "a")) {
+      _dumpall = true;
     } else {
       LOGF("Unknown argument: %s\n", k);
       return 1;
@@ -369,4 +370,4 @@ plugin_init(plugin_name_args *info, plugin_gcc_version *ver) {
 
 int plugin_is_GPL_compatible;
 
-// © 2014 Hugo Landau <hlandau@devever.net>        Licence: LGPLv3 or later
+// © 2015 Hugo Landau <hlandau@devever.net>        Licence: LGPLv3 or later

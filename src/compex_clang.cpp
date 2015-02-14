@@ -1,3 +1,36 @@
+/* compex_clang.cpp
+ * -----------------
+ * A clang plugin for dumping annotated type information in YAML format.
+ *
+ * Load with:  clang++ -c \
+ *               -Xclang -load -Xclang /path/to/compex_clang.so \
+ *               -Xclang -plugin -Xclang compex_clang \
+ *               [-Xclang -plugin-arg-compex_clang -Xclang -<ARG>=<VALUE>] ...
+ *
+ * Current options:
+ *
+ *   o=filename   Specify output filename for type information.
+ *                Written to stdout if not specified or if specified as "-".
+ *
+ *   a            Print information about all types, not just tagged types.
+ *
+ * Supported attributes:
+ *
+ *   __attribute__((annotate("compex_tag ...")))
+ *
+ *     Since clang's plugin interface does not currently support adding new
+ *     attributes, the generic annotate attribute is used. A single string
+ *     must be specified which should start with "compex_tag " to disambiguate
+ *     between multiple uses of annotate.
+ *
+ *     The attribute may be specified multiple times. The arguments to each
+ *     invocation are kept separately and then aggregated in a list.
+ *
+ *     When used on structures, this also indicates that the structure's type
+ *     information should be dumped. Structures are not dumped by default.
+ *
+ */
+
 #define __STDC_CONSTANT_MACROS
 #define __STDC_FORMAT_MACROS
 #define __STDC_LIMIT_MACROS
@@ -21,17 +54,20 @@ struct Consumer :public ASTConsumer {
   Consumer(CompilerInstance &ci, raw_ostream *out);
 
   virtual bool HandleTopLevelDecl(DeclGroupRef dg);
+  void SetDumpAll(bool dumpAll);
 
 protected:
   raw_ostream &_Indent();
-  void _HandleNamedDecl(const NamedDecl *d);
+  bool _ShouldDump(const NamedDecl *d);
   void _HandleLocation(SourceLocation loc);
+  void _HandleAttrs(const Decl *d);
+
+  void _HandleNamedDecl(const NamedDecl *d);
   void _HandleRecordDecl(const RecordDecl *d);
   void _HandleFieldDecl(const FieldDecl *d);
   void _HandleFunctionDecl(const FunctionDecl *d);
   void _HandleParamDecl(const ParmVarDecl *d);
   void _HandleBaseSpecifier(const CXXBaseSpecifier *b);
-  void _HandleAttrs(const Decl *d);
 
   struct indent {
     indent(Consumer &c) :_c(c) {
@@ -47,6 +83,7 @@ protected:
   ASTContext &_ctx;
   raw_ostream *_out;
   int _indent;
+  bool _dumpAll = false;
 };
 #define INDENT_SCOPE() indent _indenter(*this)
 
@@ -57,6 +94,10 @@ raw_ostream &Consumer::_Indent() {
   for (int i=0; i<_indent; ++i)
     *_out << "  ";
   return *_out;
+}
+
+void Consumer::SetDumpAll(bool dumpAll) {
+  _dumpAll = dumpAll;
 }
 
 bool Consumer::HandleTopLevelDecl(DeclGroupRef dg) {
@@ -77,9 +118,28 @@ void Consumer::_HandleLocation(SourceLocation loc) {
   _Indent() << "$srcLine: " << smgr.getSpellingLineNumber(loc) << "\n";
 }
 
+bool Consumer::_ShouldDump(const NamedDecl *nd) {
+  if (_dumpAll)
+    return true;
+
+  for (const Attr *a :nd->attrs()) {
+    auto aa = dyn_cast<AnnotateAttr>(a);
+    if (!aa)
+      continue;
+
+    if (aa->getAnnotation().startswith("compex_tag"))
+      return true;
+  }
+
+  return false;
+}
+
 void Consumer::_HandleNamedDecl(const NamedDecl *nd) {
   auto kind = nd->getKind();
   const char *kindStr = NULL;
+
+  if (!_ShouldDump(nd))
+    return;
 
   switch (kind) {
     case Decl::Record:
@@ -248,6 +308,7 @@ protected:
   std::string _outputfn;
   llvm::raw_fd_ostream *_outfd;
   llvm::raw_ostream *_out;
+  bool _dumpAll = false;
 };
 
 ASTConsumer
@@ -264,7 +325,12 @@ ASTConsumer
     return NULL;
   }
 
-  return new Consumer(ci, _out);
+  auto c = new Consumer(ci, _out);
+
+  if (_dumpAll)
+    c->SetDumpAll(true);
+
+  return c;
 }
 
 bool Plugin::ParseArgs(
@@ -278,11 +344,11 @@ bool Plugin::ParseArgs(
       }
 
       _outputfn = arg.substr(3);
-    }
+    } else if (arg == "-a")
+      _dumpAll = true;
+    else
+      PrintHelp(llvm::errs());
   }
-
-  if (!args.empty() && args[0] == "help")
-    PrintHelp(llvm::errs());
 
   return true;
 }
@@ -291,11 +357,17 @@ void Plugin::PrintHelp(llvm::raw_ostream &ros) {
   ros << "compex_clang\n";
   ros << "  Supported options:\n";
   ros << "  [-Xclang] -plugin-arg-compex_clang [-Xclang] -o=<output filename>   (default: stdout)\n";
+  ros << "    Write YAML output to the specified file instead of stdout.\n";
+  ros << "  [-Xclang] -plugin-arg-compex_clang [-Xclang] -a\n";
+  ros << "    Dump information for all types, not just tagged types.\n";
   ros << "\n";
 }
 
 END_NS
 
-static FrontendPluginRegistry::Add<Plugin> _plugin("compex_clang", "Reflection plugin.");
+/* Autoregistration
+ * ----------------
+ */
+static FrontendPluginRegistry::Add<Plugin> _plugin("compex_clang", "Type information dumping plugin.");
 
 // © 2015 Hugo Landau <hlandau@devever.net>      UoI-NCSA License
