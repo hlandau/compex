@@ -128,7 +128,7 @@ syntax due to what appears to be a bug in GCC, but this is all smoothed over by
 
 Extras
 ------
-The barebones script `script/compex-convert` can be used to convert the YAML
+The barebones script `src/compex-convert` can be used to convert the YAML
 output into JSON, if desired, or alternately into a format intended to be
 amenable to processing with the C preprocessor.
 
